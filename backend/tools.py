@@ -263,8 +263,12 @@ def plot_chart(
 
     else:
         b_mode = "group" if color_col and color_col != eixo_x else "relative"
+        
+        # Se não houver color_col (agrupamento), forçamos a cor pelo eixo X para colorir cada barra diferente
+        plot_color = color_col if color_col else eixo_x
+        
         fig = px.bar(
-            df_plot, x=x_col, y=eixo_y, color=color_col, barmode=b_mode,
+            df_plot, x=x_col, y=eixo_y, color=plot_color, barmode=b_mode,
             title=titulo, labels=label_map, color_discrete_sequence=_NEOTRUST_COLORS,
         )
         fig.update_traces(
@@ -296,11 +300,13 @@ def plot_chart(
     if tipo not in ['pizza', 'pie', 'treemap']:
         fig.update_xaxes(type='category')
 
+        # Usando a formatação 's' do D3.js no Plotly para agrupar as casas de mil, milhão, bilhão com K, M, B
+        # O prefixo R$ a gente gerencia via tickprefix caso seja faturamento ou preço.
         y_axis_fmt = dict()
         if eixo_y in ['faturamento', 'preco_medio']:
-            y_axis_fmt = dict(tickprefix="R$ ", tickformat=",.", separatethousands=True)
+            y_axis_fmt = dict(tickprefix="R$ ", tickformat=".3s")
         elif eixo_y == 'unidades_vendidas':
-            y_axis_fmt = dict(tickformat=",.", separatethousands=True)
+            y_axis_fmt = dict(tickformat=".3s")
 
         fig.update_yaxes(**y_axis_fmt, gridcolor="rgba(0,0,0,0.06)", gridwidth=1)
         fig.update_xaxes(showgrid=False, tickfont=dict(size=11))
@@ -326,10 +332,12 @@ def plot_chart(
             bgcolor="white",
             font_size=12,
             font_family="Inter, Helvetica, Arial, sans-serif",
+            font=dict(color="black"),
             bordercolor="#e5e5ea",
         ),
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
+        separators=",.",
     )
 
     global _last_generated_chart

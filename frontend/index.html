@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html><meta content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; connect-src 'self' http://localhost:8000 ws://localhost:8000;" http-equiv="Content-Security-Policy"/>
+<html><meta content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; connect-src 'self' http://localhost:8080 ws://localhost:8080 https://cdnjs.cloudflare.com;" http-equiv="Content-Security-Policy"/>
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -809,6 +809,9 @@
 </div>
 <script>
 (function() {
+    // 🔗 DICA: Altere esta variável para a porta que estiver rodando no uvicorn (8080 ou 8000)
+    const BACKEND_URL = "http://localhost:8080";
+
     function init() {
     // ── Existing floating chat elements ──
     const chatOverlay = document.getElementById('neotrust-agent-chat');
@@ -996,7 +999,7 @@
         aiPageMessages.scrollTop = aiPageMessages.scrollHeight;
 
         try {
-            var fetchPromise = fetch('http://localhost:8000/chat', {
+            var fetchPromise = fetch(`${BACKEND_URL}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: text, history: chatHistory })
@@ -1120,7 +1123,7 @@
             var activeItem = document.querySelector('.ai-history-item.active span');
             var title = activeItem ? activeItem.textContent.trim() : 'Conversa NeoTrust';
 
-            var response = await fetch('http://localhost:8000/chat/export-pdf', {
+            var response = await fetch(`${BACKEND_URL}/chat/export-pdf`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1234,7 +1237,7 @@
         formData.append('history', JSON.stringify(chatHistory));
         
         try {
-            var fetchPromise = fetch('http://localhost:8000/chat/audio', {
+            var fetchPromise = fetch(`${BACKEND_URL}/chat/audio`, {
                 method: 'POST',
                 body: formData
             }).then(function(r) { return r.json(); });
@@ -1330,7 +1333,7 @@
         floatingMessages.scrollTop = floatingMessages.scrollHeight;
 
         try {
-            var fetchPromise = fetch('http://localhost:8000/chat', {
+            var fetchPromise = fetch(`${BACKEND_URL}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: text, history: chatHistory })
