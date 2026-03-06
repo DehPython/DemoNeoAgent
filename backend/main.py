@@ -6,6 +6,18 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from backend.agent import agent_app, get_system_prompt
 import re
 import json
+import tempfile
+import os
+from fastapi import FastAPI, UploadFile, File, Form
+from backend.asr.asr_whisper_acc import LiteASRTranscriptionService
+
+# Inicialização global do serviço de ASR (lite-whisper)
+try:
+    print("[ASR] Inicializando serviço Whisper...")
+    asr_service = LiteASRTranscriptionService()
+except Exception as e:
+    print(f"[ASR] Erro ao carregar ASR: {e}")
+    asr_service = None
 
 app = FastAPI()
 
@@ -22,21 +34,21 @@ class ChatRequest(BaseModel):
     history: List[Dict[str, str]] = []
 
 @app.post("/chat")
-async def chat_endpoint(request: ChatRequest):
+async def process_agent_message(message: str, history: List[Dict[str, str]]):
     messages = [SystemMessage(content=get_system_prompt())]
-    for msg in request.history:
+    for msg in history:
         if msg["role"] == "user":
             messages.append(HumanMessage(content=msg["content"]))
         else:
             messages.append(AIMessage(content=msg["content"]))
             
-    messages.append(HumanMessage(content=request.message))
+    messages.append(HumanMessage(content=message))
     
     # Thread ID estático para demo
     config = {"configurable": {"thread_id": "demo_session"}} 
     
     # Invocação do agente React - iterativamente chama ferramentas até ter a resposta final
-    print(f"\n[INVOKING AGENT] user_message: '{request.message}'")
+    print(f"\n[INVOKING AGENT] user_message: '{message}'")
     
     # Processando em stream para logar passo a passo das ferramentas
     final_message = ""
@@ -74,3 +86,43 @@ async def chat_endpoint(request: ChatRequest):
         "response": final_message.strip(),
         "chartData": chart_json
     }
+
+@app.post("/chat")
+async def chat_endpoint(request: ChatRequest):
+    return await process_agent_message(request.message, request.history)
+
+@app.post("/chat/audio")
+async def chat_audio_endpoint(audio_file: UploadFile = File(...), history: str = Form(...)):
+    history_list = json.loads(history)
+    
+    if asr_service is None:
+        return {"response": "Erro: Serviço de transcrição de áudio não disponível.", "chartData": None, "transcription": ""}
+        
+    # Salvar áudio num tempfile
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_audio:
+        content = await audio_file.read()
+        temp_audio.write(content)
+        temp_audio_path = temp_audio.name
+        
+    try:
+        print(f"\n[ASR] Transcrevendo áudio recebido ({len(content)} bytes)...")
+        result = asr_service.transcribe_file(temp_audio_path)
+        transcribed_text = result.text.strip()
+        print(f"[ASR] Transcrição concluída: '{transcribed_text}'")
+        
+        # Filtro de silêncios/alucinações comuns do Whisper large-v3-turbo em PT-BR
+        silence_hallucinations = ["e aí", "e ai", "e", "é", "ah", "hum", "...", "e aí?", "."]
+        
+        if not transcribed_text or transcribed_text.lower() in silence_hallucinations or len(transcribed_text) < 2:
+            return {
+                "response": "Desculpe, não consegui te ouvir direito. Seu áudio ficou vazio ou muito baixo. Poderia verificar seu microfone e tentar de novo?", 
+                "chartData": None, 
+                "transcription": ""
+            }
+            
+        agent_response = await process_agent_message(transcribed_text, history_list)
+        agent_response["transcription"] = transcribed_text
+        return agent_response
+    finally:
+        if os.path.exists(temp_audio_path):
+            os.remove(temp_audio_path)

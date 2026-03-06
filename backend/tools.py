@@ -128,25 +128,53 @@ def plot_chart(
     else: # preco_medio
         df_plot = df.groupby(groupby_cols)[eixo_y].mean().reset_index()
         
-    # Garante que as datas fiquem bonitinhas se for temporal
+    # Garante que as datas fiquem bonitinhas se for temporal e converte para string formatada
     if eixo_x == 'data':
         df_plot = df_plot.sort_values(by='data')
+        df_plot['data'] = df_plot['data'].dt.strftime('%d/%m/%Y')
+
+    # Mapeamento de nomes amigáveis para os eixos e tooltips
+    label_map = {
+        'data': 'Data',
+        'plataforma': 'Plataforma',
+        'categoria': 'Categoria',
+        'faturamento': 'Faturamento (R$)',
+        'unidades_vendidas': 'Unidades Vendidas',
+        'preco_medio': 'Preço Médio (R$)'
+    }
+    
+    # Adicionando fallback para qualquer coluna não mapeada
+    for col in df_plot.columns:
+        if col not in label_map:
+            label_map[col] = col.replace('_', ' ').title()
 
     # Cria a figura com Plotly Express
     fig = None
     color_col = agrupamento if agrupamento in df_plot.columns else None
     
     if tipo_grafico.lower() in ['linha', 'line']:
-        fig = px.line(df_plot, x=eixo_x, y=eixo_y, color=color_col, title=titulo, markers=True)
+        fig = px.line(df_plot, x=eixo_x, y=eixo_y, color=color_col, title=titulo, markers=True, labels=label_map)
     else:
-        # Default para barras
-        fig = px.bar(df_plot, x=eixo_x, y=eixo_y, color=color_col, barmode="group", title=titulo)
+        # Default para barras. Se x for igual a cor, barmode=relative previne q a barra fique deslocada pra esquerda.
+        b_mode = "group" if color_col and color_col != eixo_x else "relative"
+        fig = px.bar(df_plot, x=eixo_x, y=eixo_y, color=color_col, barmode=b_mode, title=titulo, labels=label_map)
         
-    # Melhorando o layout padrão visual para ficar limpo
+    # Forçar dados categóricos no eixo X a ficarem visualmente alinhados
+    fig.update_xaxes(type='category')
+    # Opcional: remover os títulos redundantes se preferir um visual ainda mais limpo, mas eles já estarão capitalizados pelo label_map
+        
+    # Melhorando o layout padrão visual para descolar a legenda do layout e dar um respiro
     fig.update_layout(
         template="plotly_white",
-        margin=dict(l=20, r=20, t=40, b=20),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        margin=dict(l=20, r=20, t=80, b=40),
+        legend=dict(
+            orientation="h", 
+            yanchor="bottom", 
+            y=1.05, 
+            xanchor="right", 
+            x=1,
+            title_text="" # Oculta o título da legenda pra evitar sujeira visual duplicada
+        )
     )
 
     # Converte o gráfico para JSON amigável do plotly.js

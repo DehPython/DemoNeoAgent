@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html><meta content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; connect-src 'self' http://localhost:8000 ws://localhost:8000;" http-equiv="Content-Security-Policy"/><script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script><style>
+<html><meta content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; connect-src 'self' http://localhost:8080 ws://localhost:8080;" http-equiv="Content-Security-Policy"/><script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script><style>
     /* Chat Flutuante Neotrust */
     .neotrust-chat-overlay {
         position: fixed;
@@ -687,7 +687,7 @@
         const msg = document.createElement('div');
         msg.className = 'ai-msg ' + role;
         if (role === 'assistant') {
-            msg.innerHTML = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            msg.innerHTML = text.replace(/^\s*\*\s+/gm, '• ').replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         } else {
             msg.textContent = text;
         }
@@ -766,7 +766,7 @@
         aiPageMessages.scrollTop = aiPageMessages.scrollHeight;
 
         try {
-            var fetchPromise = fetch('http://localhost:8000/chat', {
+            var fetchPromise = fetch('http://localhost:8080/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: text, history: chatHistory })
@@ -785,7 +785,7 @@
             if (data.response) {
                 var responseWrapper = addPageMessage('', 'assistant');
                 var responseMsgEl = responseWrapper.querySelector('.ai-msg');
-                var formattedHtml = data.response.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                var formattedHtml = data.response.replace(/^\s*\*\s+/gm, '• ').replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
                 await typewriterEffect(responseMsgEl, formattedHtml);
             }
 
@@ -798,7 +798,24 @@
                 chartWrapper.className = 'ai-msg-wrapper assistant neo-state-enter';
                 var chartContainer = document.createElement('div');
                 chartContainer.className = 'ai-msg assistant';
-                chartContainer.style.cssText = 'width:100%;max-width:100%;padding:8px;overflow:hidden;background:rgba(255,255,255,0.04);border-radius:12px;';
+                chartContainer.style.cssText = 'width:100%;max-width:100%;padding:8px;overflow:hidden;background:rgba(255,255,255,0.04);border-radius:12px; position:relative;';
+                
+                var headerDiv = document.createElement('div');
+                headerDiv.style.cssText = 'display:flex; justify-content:flex-end; margin-bottom:4px;';
+                var dBtn = document.createElement('select');
+                dBtn.innerHTML = '<option value="" disabled selected>Baixar Imagem ⬇</option><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="svg">SVG</option>';
+                dBtn.style.cssText = 'background:transparent; border:1px solid #dbdde1; color:#6a64f7; cursor:pointer; font-size:12px; padding:4px 8px; border-radius:6px; outline:none; transition:background 0.2s; font-weight:500; font-family:inherit;';
+                dBtn.onmouseover = function() { dBtn.style.background = '#eeeefe'; };
+                dBtn.onmouseout = function() { dBtn.style.background = 'transparent'; };
+                dBtn.onchange = function() {
+                    if (this.value) {
+                        Plotly.downloadImage(chartId, {format: this.value, filename: 'neotrust_chart'});
+                        this.value = '';
+                    }
+                };
+                headerDiv.appendChild(dBtn);
+                chartContainer.appendChild(headerDiv);
+
                 var plotDiv = document.createElement('div');
                 plotDiv.id = chartId;
                 plotDiv.style.cssText = 'width:100%;height:280px;';
@@ -837,8 +854,29 @@
 
     // ── Audio button — listening overlay ──
     var audioOverlay = null;
-    aiPageAudioBtn.addEventListener('click', function() {
+    var mediaRecorder = null;
+    var audioChunks = [];
+    var audioStream = null;
+
+    aiPageAudioBtn.addEventListener('click', async function() {
         if (audioOverlay) return;
+        
+        try {
+            audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(audioStream);
+            audioChunks = [];
+            
+            mediaRecorder.ondataavailable = function(e) {
+                if (e.data.size > 0) audioChunks.push(e.data);
+            };
+            
+            mediaRecorder.start();
+        } catch (err) {
+            console.error('Erro ao acessar microfone:', err);
+            alert('Não foi possível acessar seu microfone. Verifique as permissões.');
+            return;
+        }
+
         audioOverlay = document.createElement('div');
         audioOverlay.className = 'neo-audio-overlay';
         audioOverlay.innerHTML =
@@ -848,12 +886,35 @@
                 '<div class="neo-ring"></div>' +
                 '<div class="neo-mic-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></div>' +
             '</div>' +
-            '<div class="neo-audio-label">Ouvindo...</div>' +
+            '<div class="neo-audio-label">Gravando...</div>' +
             '<div class="neo-audio-bars"><span></span><span></span><span></span><span></span><span></span></div>' +
-            '<div class="neo-audio-sublabel">Fale sua pergunta sobre o mercado</div>' +
-            '<button class="neo-audio-cancel">Cancelar</button>';
+            '<div class="neo-audio-sublabel">Diga sua pergunta sobre o mercado</div>' +
+            '<div style="display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:32px; width:100%; z-index:10;">' +
+            '<button class="neo-audio-send" style="background:#fff; color:#6a64f7; padding:14px 32px; border:none; border-radius:30px; font-weight:700; font-size:16px; cursor:pointer; box-shadow:0 4px 15px rgba(0,0,0,0.2); width:80%; max-width:240px; transition:all 0.2s;">Enviar audio</button>' +
+            '<button class="neo-audio-cancel" style="background:transparent; color:rgba(255,255,255,0.7); padding:8px 16px; border:none; font-size:14px; cursor:pointer; text-decoration:underline; transition:color 0.2s;">Cancelar gravação</button>' +
+            '</div>';
+            
         aiAgentPage.appendChild(audioOverlay);
-        audioOverlay.querySelector('.neo-audio-cancel').addEventListener('click', closeAudioOverlay);
+        
+        audioOverlay.querySelector('.neo-audio-send').addEventListener('click', function() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.onstop = function() {
+                    var audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    sendAudioMessage(audioBlob);
+                };
+                mediaRecorder.stop();
+                audioStream.getTracks().forEach(track => track.stop());
+            }
+            closeAudioOverlay();
+        });
+        
+        audioOverlay.querySelector('.neo-audio-cancel').addEventListener('click', function() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                audioStream.getTracks().forEach(track => track.stop());
+            }
+            closeAudioOverlay();
+        });
     });
 
     function closeAudioOverlay() {
@@ -866,6 +927,94 @@
             }
             audioOverlay = null;
         }, 250);
+    }
+
+    async function sendAudioMessage(audioBlob) {
+        enterChatMode();
+        var userWrapper = addPageMessage('🎤 Processando transcrição...', 'user');
+        var userMsgEl = userWrapper.querySelector('.ai-msg');
+        
+        var bubble = createAnimatedBubble(aiPageMessagesInner);
+        aiPageMessages.scrollTop = aiPageMessages.scrollHeight;
+        
+        var formData = new FormData();
+        formData.append('audio_file', audioBlob, 'voice.webm');
+        formData.append('history', JSON.stringify(chatHistory));
+        
+        try {
+            var fetchPromise = fetch('http://localhost:8080/chat/audio', {
+                method: 'POST',
+                body: formData
+            }).then(function(r) { return r.json(); });
+
+            var results = await Promise.all([
+                fetchPromise,
+                new Promise(function(r) { setTimeout(r, 800); })
+            ]);
+            var data = results[0];
+            
+            aiPageMessagesInner.removeChild(bubble.wrapper);
+            
+            if (data.transcription) {
+                userMsgEl.textContent = '🎤 ' + data.transcription;
+                chatHistory.push({ role: 'user', content: data.transcription });
+            } else {
+                userMsgEl.textContent = '🎤 (Áudio inaudível)';
+            }
+
+            if (data.response) {
+                var responseWrapper = addPageMessage('', 'assistant');
+                var responseMsgEl = responseWrapper.querySelector('.ai-msg');
+                var formattedHtml = data.response.replace(/^\s*\*\s+/gm, '• ').replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                await typewriterEffect(responseMsgEl, formattedHtml);
+                chatHistory.push({ role: 'assistant', content: data.response });
+            }
+
+            if (data.chartData) {
+                var chartId = 'ai-chart-' + Date.now();
+                var chartWrapper = document.createElement('div');
+                chartWrapper.className = 'ai-msg-wrapper assistant neo-state-enter';
+                var chartContainer = document.createElement('div');
+                chartContainer.className = 'ai-msg assistant';
+                chartContainer.style.cssText = 'width:100%;max-width:100%;padding:8px;overflow:hidden;background:rgba(255,255,255,0.04);border-radius:12px; position:relative;';
+                
+                var headerDiv = document.createElement('div');
+                headerDiv.style.cssText = 'display:flex; justify-content:flex-end; margin-bottom:4px;';
+                var dBtn = document.createElement('select');
+                dBtn.innerHTML = '<option value="" disabled selected>Baixar Imagem ⬇</option><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="svg">SVG</option>';
+                dBtn.style.cssText = 'background:transparent; border:1px solid #dbdde1; color:#6a64f7; cursor:pointer; font-size:12px; padding:4px 8px; border-radius:6px; outline:none; transition:background 0.2s; font-weight:500; font-family:inherit;';
+                dBtn.onmouseover = function() { dBtn.style.background = '#eeeefe'; };
+                dBtn.onmouseout = function() { dBtn.style.background = 'transparent'; };
+                dBtn.onchange = function() {
+                    if (this.value) {
+                        Plotly.downloadImage(chartId, {format: this.value, filename: 'neotrust_chart'});
+                        this.value = '';
+                    }
+                };
+                headerDiv.appendChild(dBtn);
+                chartContainer.appendChild(headerDiv);
+
+                var plotDiv = document.createElement('div');
+                plotDiv.id = chartId;
+                plotDiv.style.cssText = 'width:100%;height:280px;';
+                chartContainer.appendChild(plotDiv);
+                chartWrapper.appendChild(chartContainer);
+                aiPageMessagesInner.appendChild(chartWrapper);
+
+                var layout = Object.assign({}, data.chartData.layout || {}, {
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    font: { color: '#2e323c' }
+                });
+                Plotly.newPlot(chartId, data.chartData.data, layout, { responsive: true, displayModeBar: false });
+            }
+            aiPageMessages.scrollTop = aiPageMessages.scrollHeight;
+        } catch (error) {
+            console.error('Fetch request failed', error);
+            aiPageMessagesInner.removeChild(bubble.wrapper);
+            userMsgEl.textContent = '🎤 (Falha no envio)';
+            addPageMessage('Falha ao processar áudio: ' + error.message, 'assistant');
+        }
     }
 
     // ── Keep floating chat functional for backward compat ──
@@ -887,7 +1036,7 @@
         floatingMessages.scrollTop = floatingMessages.scrollHeight;
 
         try {
-            var fetchPromise = fetch('http://localhost:8000/chat', {
+            var fetchPromise = fetch('http://localhost:8080/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: text, history: chatHistory })
@@ -908,7 +1057,7 @@
                 aiMsgContent.className = 'neotrust-chat-msg assistant';
                 aiMsg.appendChild(aiMsgContent);
                 floatingMessages.appendChild(aiMsg);
-                var formattedText = data.response.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                var formattedText = data.response.replace(/^\s*\*\s+/gm, '• ').replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
                 await typewriterEffect(aiMsgContent, formattedText);
             }
             chatHistory.push({ role: 'user', content: text });
@@ -919,7 +1068,24 @@
                 cw.className = 'chat-msg-wrapper assistant neo-state-enter';
                 var cc = document.createElement('div');
                 cc.className = 'neotrust-chat-msg assistant';
-                cc.style.cssText = 'width:100%;max-width:100%;padding:8px;overflow:hidden;background:white;';
+                cc.style.cssText = 'width:100%;max-width:100%;padding:8px;overflow:hidden;background:white; position:relative;';
+                
+                var topDiv = document.createElement('div');
+                topDiv.style.cssText = 'display:flex; justify-content:flex-end; margin-bottom:4px;';
+                var dBtnFloat = document.createElement('select');
+                dBtnFloat.innerHTML = '<option value="" disabled selected>Baixar Imagem ⬇</option><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="svg">SVG</option>';
+                dBtnFloat.style.cssText = 'background:transparent; border:1px solid #dbdde1; color:#6a64f7; cursor:pointer; font-size:12px; padding:4px 8px; border-radius:6px; outline:none; transition:background 0.2s; font-weight:500; font-family:inherit;';
+                dBtnFloat.onmouseover = function() { dBtnFloat.style.background = '#eeeefe'; };
+                dBtnFloat.onmouseout = function() { dBtnFloat.style.background = 'transparent'; };
+                dBtnFloat.onchange = function() {
+                    if(this.value) {
+                        Plotly.downloadImage(cid, {format: this.value, filename: 'neotrust_chart'});
+                        this.value = '';
+                    }
+                };
+                topDiv.appendChild(dBtnFloat);
+                cc.appendChild(topDiv);
+
                 var pd = document.createElement('div');
                 pd.id = cid;
                 pd.style.cssText = 'width:100%;height:250px;';
