@@ -33,7 +33,6 @@ class ChatRequest(BaseModel):
     message: str
     history: List[Dict[str, str]] = []
 
-@app.post("/chat")
 async def process_agent_message(message: str, history: List[Dict[str, str]]):
     messages = [SystemMessage(content=get_system_prompt())]
     for msg in history:

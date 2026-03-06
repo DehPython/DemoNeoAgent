@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 
-<html><meta content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; connect-src 'self' http://localhost:8080 ws://localhost:8080;" http-equiv="Content-Security-Policy"/><script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script><style>
+<html><meta content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; connect-src 'self' http://localhost:8080 ws://localhost:8080;" http-equiv="Content-Security-Policy"/>
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
     /* Chat Flutuante Neotrust */
     .neotrust-chat-overlay {
         position: fixed;
@@ -941,15 +944,25 @@
                 var headerDiv = document.createElement('div');
                 headerDiv.style.cssText = 'display:flex; justify-content:flex-end; margin-bottom:4px;';
                 var dBtn = document.createElement('select');
-                dBtn.innerHTML = '<option value="" disabled selected>Baixar Imagem ⬇</option><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="svg">SVG</option>';
+                dBtn.innerHTML = '<option value="" disabled selected>Baixar Gráfico ⬇</option><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="svg">SVG</option><option value="pdf">PDF</option>';
                 dBtn.style.cssText = 'background:transparent; border:1px solid #dbdde1; color:#6a64f7; cursor:pointer; font-size:12px; padding:4px 8px; border-radius:6px; outline:none; transition:background 0.2s; font-weight:500; font-family:inherit;';
                 dBtn.onmouseover = function() { dBtn.style.background = '#eeeefe'; };
                 dBtn.onmouseout = function() { dBtn.style.background = 'transparent'; };
                 dBtn.onchange = function() {
-                    if (this.value) {
-                        Plotly.downloadImage(chartId, {format: this.value, filename: 'neotrust_chart'});
-                        this.value = '';
+                    const format = this.value;
+                    if (!format) return;
+                    
+                    if (format === 'pdf') {
+                        Plotly.toImage(chartId, {format: 'png', width: 800, height: 600}).then(function(dataUrl) {
+                            const { jsPDF } = window.jspdf;
+                            const pdf = new jsPDF('l', 'px', [800, 600]);
+                            pdf.addImage(dataUrl, 'PNG', 0, 0, 800, 600);
+                            pdf.save('neotrust_chart.pdf');
+                        });
+                    } else {
+                        Plotly.downloadImage(chartId, {format: format, filename: 'neotrust_chart'});
                     }
+                    this.value = '';
                 };
                 headerDiv.appendChild(dBtn);
                 chartContainer.appendChild(headerDiv);
@@ -1211,15 +1224,25 @@
                 var topDiv = document.createElement('div');
                 topDiv.style.cssText = 'display:flex; justify-content:flex-end; margin-bottom:4px;';
                 var dBtnFloat = document.createElement('select');
-                dBtnFloat.innerHTML = '<option value="" disabled selected>Baixar Imagem ⬇</option><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="svg">SVG</option>';
+                dBtnFloat.innerHTML = '<option value="" disabled selected>Baixar Gráfico ⬇</option><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="svg">SVG</option><option value="pdf">PDF</option>';
                 dBtnFloat.style.cssText = 'background:transparent; border:1px solid #dbdde1; color:#6a64f7; cursor:pointer; font-size:12px; padding:4px 8px; border-radius:6px; outline:none; transition:background 0.2s; font-weight:500; font-family:inherit;';
                 dBtnFloat.onmouseover = function() { dBtnFloat.style.background = '#eeeefe'; };
                 dBtnFloat.onmouseout = function() { dBtnFloat.style.background = 'transparent'; };
                 dBtnFloat.onchange = function() {
-                    if(this.value) {
-                        Plotly.downloadImage(cid, {format: this.value, filename: 'neotrust_chart'});
-                        this.value = '';
+                    const format = this.value;
+                    if (!format) return;
+                    
+                    if (format === 'pdf') {
+                        Plotly.toImage(cid, {format: 'png', width: 800, height: 600}).then(function(dataUrl) {
+                            const { jsPDF } = window.jspdf;
+                            const pdf = new jsPDF('l', 'px', [800, 600]);
+                            pdf.addImage(dataUrl, 'PNG', 0, 0, 800, 600);
+                            pdf.save('neotrust_chart.pdf');
+                        });
+                    } else {
+                        Plotly.downloadImage(cid, {format: format, filename: 'neotrust_chart'});
                     }
+                    this.value = '';
                 };
                 topDiv.appendChild(dBtnFloat);
                 cc.appendChild(topDiv);
