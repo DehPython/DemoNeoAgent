@@ -14,7 +14,7 @@ uvicorn backend.main:app --reload --port 8080
 
 Você pode escolher o valor da porta.
 
-## Habilitando o ASR
+## Habilitando a opção de usar VOZ (ASR)
 
 Para que a funcionalidade de gravação de voz (ASR) funcione corretamente, você deve seguir a ordem abaixo rigorosamente:
 
