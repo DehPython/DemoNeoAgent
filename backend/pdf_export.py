@@ -133,7 +133,7 @@ def generate_conversation_pdf(
             continue
 
         # Check if line is a section header (e.g. "1. RESUMO EXECUTIVO" or "**RESUMO EXECUTIVO**")
-        clean_line = stripped.lstrip("0123456789.-) ").replace("**", "").replace("*", "").strip()
+        clean_line = stripped.lstrip("#0123456789.-) ").replace("**", "").replace("*", "").strip()
         is_header = any(h in clean_line.upper() for h in section_headers)
 
         if is_header:
@@ -144,9 +144,9 @@ def generate_conversation_pdf(
             safe_header = _safe_text(clean_line)
             pdf.cell(0, 10, f"  {safe_header}", 0, 1, "L", fill=True)
             pdf.ln(4)
-        elif stripped.startswith(("-", "•")):
+        elif stripped.lstrip("# ").startswith(("-", "•")):
             # Bullet point
-            content = stripped.lstrip("-•").strip()
+            content = stripped.lstrip("# -•").strip()
             content = content.replace("**", "").replace("*", "")
             pdf.set_font("Helvetica", "", 10)
             pdf.set_text_color(46, 50, 60)
@@ -159,11 +159,12 @@ def generate_conversation_pdf(
             pdf.ln(2)
         else:
             # Regular paragraph
-            content = stripped.replace("**", "").replace("*", "")
-            pdf.set_font("Helvetica", "", 10)
-            pdf.set_text_color(46, 50, 60)
-            pdf.multi_cell(0, 6, _safe_text(content), 0, "L")
-            pdf.ln(2)
+            content = stripped.lstrip("# ").replace("**", "").replace("*", "").strip()
+            if content:
+                pdf.set_font("Helvetica", "", 10)
+                pdf.set_text_color(46, 50, 60)
+                pdf.multi_cell(0, 6, _safe_text(content), 0, "L")
+                pdf.ln(2)
 
     # ── CHARTS ──
     if chart_images:
