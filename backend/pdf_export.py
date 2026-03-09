@@ -153,7 +153,7 @@ def generate_conversation_pdf(
             x_start = pdf.get_x()
             pdf.set_x(x_start + 6)
             pdf.set_text_color(106, 100, 247)
-            pdf.cell(5, 6, chr(8226), 0, 0, "L")
+            pdf.cell(5, 6, "-", 0, 0, "L")
             pdf.set_text_color(46, 50, 60)
             pdf.multi_cell(0, 6, _safe_text(content), 0, "L")
             pdf.ln(2)
